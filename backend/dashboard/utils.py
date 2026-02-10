@@ -23,22 +23,37 @@ def get_google_sheet_id():
 def get_gspread_client():
     """
     Get authenticated gspread client for write operations
-    Returns None if credentials file doesn't exist
+    Reads credentials from environment variables
     """
-    creds_path = os.path.join(settings.BASE_DIR, 'google-credentials.json')
-    
-    if not os.path.exists(creds_path):
-        print(f"Google credentials not found at: {creds_path}")
-        return None
-    
     try:
+        # Build credentials dict from environment variables
+        creds_dict = {
+            "type": config('GOOGLE_TYPE', default='service_account'),
+            "project_id": config('GOOGLE_PROJECT_ID', default=''),
+            "private_key_id": config('GOOGLE_PRIVATE_KEY_ID', default=''),
+            "private_key": config('GOOGLE_PRIVATE_KEY', default='').replace('\\n', '\n'),
+            "client_email": config('GOOGLE_CLIENT_EMAIL', default=''),
+            "client_id": config('GOOGLE_CLIENT_ID', default=''),
+            "auth_uri": config('GOOGLE_AUTH_URI', default='https://accounts.google.com/o/oauth2/auth'),
+            "token_uri": config('GOOGLE_TOKEN_URI', default='https://oauth2.googleapis.com/token'),
+            "auth_provider_x509_cert_url": config('GOOGLE_AUTH_PROVIDER_CERT_URL', default='https://www.googleapis.com/oauth2/v1/certs'),
+            "client_x509_cert_url": config('GOOGLE_CLIENT_CERT_URL', default=''),
+            "universe_domain": config('GOOGLE_UNIVERSE_DOMAIN', default='googleapis.com')
+        }
+        
+        # Check if required fields are present
+        if not creds_dict['client_email'] or not creds_dict['private_key']:
+            print("Google credentials not found in environment variables")
+            return None
+        
         SCOPES = [
             'https://www.googleapis.com/auth/spreadsheets',
             'https://www.googleapis.com/auth/drive'
         ]
-        creds = Credentials.from_service_account_file(creds_path, scopes=SCOPES)
+        
+        creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
         client = gspread.authorize(creds)
-        print("✓ Successfully authenticated with Google Sheets API")
+        print("✓ Successfully authenticated with Google Sheets API from environment variables")
         return client
     except Exception as e:
         print(f"Error authenticating with Google Sheets: {str(e)}")

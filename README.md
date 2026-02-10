@@ -58,18 +58,30 @@ pip install -r requirements.txt
 ```env
 DEBUG=True
 SECRET_KEY=your-secret-key
+
+# PostgreSQL
 DB_NAME=nmt_dashboard
 DB_USER=postgres
 DB_PASSWORD=your-password
 DB_HOST=localhost
 DB_PORT=5432
+
+# Google Sheets
 USE_GOOGLE_SHEETS=True
 GOOGLE_SHEET_URL=your-google-sheet-url
+
+# Google Service Account Credentials
+GOOGLE_TYPE=service_account
+GOOGLE_PROJECT_ID=your-project-id
+GOOGLE_PRIVATE_KEY_ID=your-private-key-id
+GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYOUR_KEY\n-----END PRIVATE KEY-----\n"
+GOOGLE_CLIENT_EMAIL=your-service-account@project.iam.gserviceaccount.com
+GOOGLE_CLIENT_ID=your-client-id
 ```
 
-5. Place Google credentials:
-- Save service account JSON as `backend/google-credentials.json`
-- Share Google Sheet with service account email
+**Note:** Copy `backend/.env.example` to `backend/.env` and fill in your credentials.
+
+5. Share your Google Sheet with the service account email (GOOGLE_CLIENT_EMAIL)
 
 6. Run migrations:
 ```bash
