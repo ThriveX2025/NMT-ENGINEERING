@@ -28,7 +28,36 @@ A full-stack dashboard application for managing company data, built with Django 
 - Tailwind CSS
 - Recharts for data visualization
 
-## Setup Instructions
+## Quick Start with Docker 🐳
+
+### One-Command Deployment
+
+**Windows:**
+```cmd
+docker-start.bat
+```
+
+**Linux/Mac:**
+```bash
+chmod +x docker-start.sh
+./docker-start.sh
+```
+
+This will:
+- ✅ Pull latest code from GitHub automatically
+- ✅ Set up PostgreSQL database
+- ✅ Run Django backend with Gunicorn
+- ✅ Start Next.js frontend
+- ✅ Configure Nginx reverse proxy
+
+**Access:**
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000/api
+- Admin Panel: http://localhost:8000/admin
+
+See [DOCKER_README.md](DOCKER_README.md) for details.
+
+## Manual Setup
 
 ### Prerequisites
 - Python 3.11+

@@ -1,0 +1,19 @@
+# Offline Dockerfile using local Python
+FROM python:3.13-windowsservercore
+
+WORKDIR /app
+
+# Copy requirements and install
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install gunicorn
+
+# Copy application
+COPY . .
+
+# Create directories
+RUN mkdir staticfiles media
+
+EXPOSE 8000
+
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

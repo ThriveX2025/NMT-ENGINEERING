@@ -1,0 +1,159 @@
+services:
+  # PostgreSQL Database Service
+  db:
+    image: postgres:18-alpine
+    container_name: nmt-database
+    env_file:
+      - ./backend/.env
+    environment:
+      POSTGRES_DB: ${DB_NAME:-nmt_dashboard}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - nmt-network
+    restart: unless-stopped
+
+  # Django Backend with Auto-Fetch from GitHub
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: thrivexai/nmt-dashboard:latest
+    container_name: nmt-backend
+    user: root
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        echo "--- 🚀 Auto-Fetch Started ---"
+        
+        # Install Git if missing
+        if ! command -v git >/dev/null; then
+          apk add --no-cache git 2>/dev/null || apt-get update && apt-get install -y git
+        fi
+        
+        # Configure Git
+        git config --global --add safe.directory /app
+        cd /app
+        
+        # Clone or Update from GitHub (public repo)
+        if [ ! -d ".git" ]; then
+          echo "📂 Cloning repository..."
+          git init
+          git remote add origin "$REPO_URL"
+          git fetch origin main
+          git reset --hard origin/main
+        else
+          echo "🔄 Updating repository..."
+          git remote set-url origin "$REPO_URL" 2>/dev/null || git remote add origin "$REPO_URL"
+          git fetch origin main
+          git reset --hard origin/main
+        fi
+        
+        echo "--- ✅ Code Updated from GitHub ---"
+        
+        # Copy environment file
+        echo "📝 Setting up environment..."
+        cp /env/.env.docker /app/backend/.env
+        
+        # Install/Update Dependencies
+        echo "📦 Installing dependencies..."
+        pip install --no-cache-dir -r backend/requirements.txt
+        
+        # Navigate to backend directory
+        cd backend
+        
+        # Run Migrations
+        echo "🔄 Running migrations..."
+        python manage.py migrate --noinput
+        
+        # Collect Static Files
+        echo "📁 Collecting static files..."
+        python manage.py collectstatic --noinput
+        
+        echo "--- 🚀 Starting Server ---"
+        exec gunicorn --bind 0.0.0.0:8000 --workers 3 config.wsgi:application
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=django-insecure-change-this-in-production-xyz123
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=nmt_dashboard
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0,*
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001
+      - USE_GOOGLE_SHEETS=True
+      - GOOGLE_SHEET_URL=https://docs.google.com/spreadsheets/d/19uL0pcnCicAtx26U6xgmCDKTP4gYGbYxjVCJyb2TSII/edit?usp=sharing
+      - REPO_URL=${REPO_URL:-https://github.com/ThriveX2025/NMT-ENGINEERING.git}
+    volumes:
+      - backend_data:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      - ./backend/.env.docker:/env/.env.docker:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - nmt-network
+    restart: unless-stopped
+
+  # Next.js Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: thrivexai/nmt-frontend:latest
+    container_name: nmt-frontend
+    ports:
+      - "3001:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+    depends_on:
+      - backend
+    networks:
+      - nmt-network
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: nmt-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - static_volume:/app/staticfiles:ro
+      - media_volume:/app/media:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - nmt-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  backend_data:
+  static_volume:
+  media_volume:
+
+networks:
+  nmt-network:
+    driver: bridge
