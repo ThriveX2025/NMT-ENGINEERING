@@ -86,8 +86,8 @@ services:
       - DB_NAME=nmt_dashboard
       - DB_USER=postgres
       - DB_PASSWORD=postgres
-      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0,*
-      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001
+      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0,*,nmt.thrivexai.cloud
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001,https://nmt.thrivexai.cloud,http://nmt.thrivexai.cloud,https://nmt.thrivexai.cloud:9001,http://nmt.thrivexai.cloud:9001
       - USE_GOOGLE_SHEETS=True
       - GOOGLE_SHEET_URL=https://docs.google.com/spreadsheets/d/19uL0pcnCicAtx26U6xgmCDKTP4gYGbYxjVCJyb2TSII/edit?usp=sharing
       - REPO_URL=${REPO_URL:-https://github.com/ThriveX2025/NMT-ENGINEERING.git}
@@ -109,7 +109,7 @@ services:
     ports:
       - "9001:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://backend:8000
+      - NEXT_PUBLIC_API_URL=https://nmt.thrivexai.cloud:9000
     depends_on:
       - backend
     networks:
