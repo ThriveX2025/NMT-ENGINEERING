@@ -102,14 +102,67 @@ services:
       - nmt-network
     restart: unless-stopped
 
-  # Next.js Frontend
+  # Next.js Frontend with Auto-Fetch from GitHub
   frontend:
-    image: thrivexai/nmt-frontend:latest
+    image: node:20-alpine
     container_name: nmt-frontend
+    user: root
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        echo "--- 🚀 Frontend Auto-Fetch Started ---"
+        
+        # Install Git if missing
+        if ! command -v git >/dev/null; then
+          apk add --no-cache git
+        fi
+        
+        # Configure Git
+        git config --global --add safe.directory /app
+        cd /app
+        
+        # Clone or Update from GitHub (public repo)
+        if [ ! -d ".git" ]; then
+          echo "📂 Cloning repository..."
+          git init
+          git remote add origin "$REPO_URL"
+          git fetch origin main
+          git reset --hard origin/main
+        else
+          echo "🔄 Updating repository..."
+          git remote set-url origin "$REPO_URL" 2>/dev/null || git remote add origin "$REPO_URL"
+          git fetch origin main
+          git reset --hard origin/main
+        fi
+        
+        echo "--- ✅ Code Updated from GitHub ---"
+        
+        # Navigate to frontend directory
+        cd frontend
+        
+        # Install/Update Dependencies
+        echo "📦 Installing dependencies..."
+        npm ci
+        
+        # Build application
+        echo "🔨 Building frontend..."
+        npm run build
+        
+        echo "--- 🚀 Starting Frontend Server ---"
+        cd .next/standalone
+        exec node server.js
     ports:
       - "9001:3000"
     environment:
       - NEXT_PUBLIC_API_URL=https://nmt.thrivexai.cloud:9000
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - REPO_URL=${REPO_URL:-https://github.com/ThriveX2025/NMT-ENGINEERING.git}
+    volumes:
+      - frontend_data:/app
     depends_on:
       - backend
     networks:
@@ -136,6 +189,7 @@ services:
 volumes:
   postgres_data:
   backend_data:
+  frontend_data:
   static_volume:
   media_volume:
 
