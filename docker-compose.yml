@@ -10,8 +10,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+     
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
       interval: 30s
@@ -86,7 +85,7 @@ services:
       - DB_NAME=nmt_dashboard
       - DB_USER=postgres
       - DB_PASSWORD=postgres
-      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0,*,nmt.thrivexai.cloud
+      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0,*
       - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001,https://nmt.thrivexai.cloud,http://nmt.thrivexai.cloud,https://nmt.thrivexai.cloud:9001,http://nmt.thrivexai.cloud:9001
       - USE_GOOGLE_SHEETS=True
       - GOOGLE_SHEET_URL=https://docs.google.com/spreadsheets/d/19uL0pcnCicAtx26U6xgmCDKTP4gYGbYxjVCJyb2TSII/edit?usp=sharing
@@ -102,9 +101,9 @@ services:
       - nmt-network
     restart: unless-stopped
 
-  # Next.js Frontend with Auto-Fetch from GitHub
+  # Next.js Frontend
   frontend:
-    image: node:20-alpine
+    image: thrivexai/nmt-frontend:latest
     container_name: nmt-frontend
     user: root
     entrypoint:
@@ -156,7 +155,6 @@ services:
     ports:
       - "9001:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=https://nmt.thrivexai.cloud:9000
       - NODE_ENV=production
       - PORT=3000
       - HOSTNAME=0.0.0.0
@@ -179,12 +177,94 @@ services:
     volumes:
       - static_volume:/app/staticfiles:ro
       - media_volume:/app/media:ro
+    configs:
+      - source: nginx_config
+        target: /etc/nginx/nginx.conf
     depends_on:
       - backend
       - frontend
     networks:
       - nmt-network
     restart: unless-stopped
+
+configs:
+  nginx_config:
+    content: |
+      events {
+          worker_connections 1024;
+      }
+
+      http {
+          include /etc/nginx/mime.types;
+          default_type application/octet-stream;
+
+          access_log /var/log/nginx/access.log;
+          error_log /var/log/nginx/error.log;
+
+          gzip on;
+          gzip_vary on;
+          gzip_min_length 1024;
+          gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml+rss application/json;
+
+          upstream backend {
+              server backend:8000;
+          }
+
+          upstream frontend {
+              server frontend:3000;
+          }
+
+          server {
+              listen 80;
+              server_name localhost;
+              client_max_body_size 100M;
+
+              add_header X-Frame-Options "DENY" always;
+              add_header X-Content-Type-Options "nosniff" always;
+              add_header X-XSS-Protection "1; mode=block" always;
+              add_header Referrer-Policy "no-referrer-when-downgrade" always;
+
+              location /api/ {
+                  proxy_pass http://backend;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  proxy_redirect off;
+              }
+
+              location /admin/ {
+                  proxy_pass http://backend;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+              }
+
+              location /static/ {
+                  alias /app/staticfiles/;
+                  expires 30d;
+                  add_header Cache-Control "public, immutable";
+              }
+
+              location /media/ {
+                  alias /app/media/;
+                  expires 7d;
+                  add_header Cache-Control "public";
+              }
+
+              location / {
+                  proxy_pass http://frontend;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection "upgrade";
+              }
+          }
+      }
 
 volumes:
   postgres_data:
@@ -195,4 +275,4 @@ volumes:
 
 networks:
   nmt-network:
-    driver: bridge
+    driver: bridge 
