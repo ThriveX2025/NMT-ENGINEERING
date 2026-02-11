@@ -1,10 +1,9 @@
 services:
   # PostgreSQL Database Service
   db:
-    image: postgres:18-alpine
+    image: postgres:17.7 
     container_name: nmt-database
-    env_file:
-      - ./backend/.env
+     
     environment:
       POSTGRES_DB: ${DB_NAME:-nmt_dashboard}
       POSTGRES_USER: ${DB_USER:-postgres}
@@ -12,7 +11,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
       interval: 30s
@@ -24,9 +23,6 @@ services:
 
   # Django Backend with Auto-Fetch from GitHub
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
     image: thrivexai/nmt-dashboard:latest
     container_name: nmt-backend
     user: root
@@ -80,9 +76,8 @@ services:
         echo "--- 🚀 Starting Server ---"
         exec gunicorn --bind 0.0.0.0:8000 --workers 3 config.wsgi:application
     ports:
-      - "8000:8000"
-    env_file:
-      - ./backend/.env
+      - "9000:8000"
+    
     environment:
       - DEBUG=True
       - SECRET_KEY=django-insecure-change-this-in-production-xyz123
@@ -100,7 +95,6 @@ services:
       - backend_data:/app
       - static_volume:/app/staticfiles
       - media_volume:/app/media
-      - ./backend/.env:/app/backend/.env:ro
     depends_on:
       db:
         condition: service_healthy
@@ -110,13 +104,10 @@ services:
 
   # Next.js Frontend
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
     image: thrivexai/nmt-frontend:latest
     container_name: nmt-frontend
     ports:
-      - "3001:3000"
+      - "9001:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://backend:8000
     depends_on:
@@ -130,11 +121,9 @@ services:
     image: nginx:alpine
     container_name: nmt-nginx
     ports:
-      - "80:80"
-      - "443:443"
+      - "9080:80"
+      - "9443:443"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
       - static_volume:/app/staticfiles:ro
       - media_volume:/app/media:ro
     depends_on:
